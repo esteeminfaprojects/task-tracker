@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from "react";
-import { 
-  DEFAULT_ROLES, 
+import React, { useState, useEffect, useRef } from "react";
+import { isRemoteEnabled } from "./supabaseClient";
+import { loadAllRemote, saveRemote } from "./remoteStore";
+import {
+  DEFAULT_ROLES,
   DEFAULT_DEPARTMENTS, 
   DEFAULT_PROJECTS, 
   DEFAULT_USERS, 
@@ -87,29 +89,69 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<"admin" | "hod" | "user" | "ai">("user");
   const [showUserDropdown, setShowUserDropdown] = useState(false);
 
-  // Sync back to local storage on changes
+  // Becomes true once shared data has loaded (or Supabase is confirmed off).
+  // Prevents pushing local defaults to the cloud before we've read it.
+  const hydratedRef = useRef(false);
+
+  // One-time hydration from Supabase = shared source of truth across all
+  // browsers/devices. Missing collections are seeded from current state.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!isRemoteEnabled) {
+        hydratedRef.current = true;
+        return;
+      }
+      try {
+        const remote = await loadAllRemote();
+        if (cancelled) return;
+        remote.roles ? setRoles(remote.roles as Role[]) : saveRemote("roles", roles);
+        remote.departments ? setDepartments(remote.departments as Department[]) : saveRemote("departments", departments);
+        remote.projects ? setProjects(remote.projects as Project[]) : saveRemote("projects", projects);
+        remote.users ? setUsers(remote.users as User[]) : saveRemote("users", users);
+        remote.tasks ? setTasks(remote.tasks as Task[]) : saveRemote("tasks", tasks);
+        remote.timeLogs ? setTimeLogs(remote.timeLogs as TimeLog[]) : saveRemote("timeLogs", timeLogs);
+      } catch (err) {
+        console.error("[App] remote hydration failed, using local data:", err);
+      } finally {
+        hydratedRef.current = true;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Sync back to local storage (offline cache) AND Supabase (shared) on changes.
   useEffect(() => {
     localStorage.setItem("tracker_roles", JSON.stringify(roles));
+    if (hydratedRef.current) saveRemote("roles", roles);
   }, [roles]);
 
   useEffect(() => {
     localStorage.setItem("tracker_departments", JSON.stringify(departments));
+    if (hydratedRef.current) saveRemote("departments", departments);
   }, [departments]);
 
   useEffect(() => {
     localStorage.setItem("tracker_projects", JSON.stringify(projects));
+    if (hydratedRef.current) saveRemote("projects", projects);
   }, [projects]);
 
   useEffect(() => {
     localStorage.setItem("tracker_users_v2", JSON.stringify(users));
+    if (hydratedRef.current) saveRemote("users", users);
   }, [users]);
 
   useEffect(() => {
     localStorage.setItem("tracker_tasks_v2", JSON.stringify(tasks));
+    if (hydratedRef.current) saveRemote("tasks", tasks);
   }, [tasks]);
 
   useEffect(() => {
     localStorage.setItem("tracker_timeLogs_v2", JSON.stringify(timeLogs));
+    if (hydratedRef.current) saveRemote("timeLogs", timeLogs);
   }, [timeLogs]);
 
   useEffect(() => {
