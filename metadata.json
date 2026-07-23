@@ -1,0 +1,6 @@
+{
+  "name": "Task Management and Time Tracker",
+  "description": "An enterprise-grade task, project, and time tracker application featuring role management, admin/HOD/user panels, automated daily time capture, and Gemini-powered time analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
