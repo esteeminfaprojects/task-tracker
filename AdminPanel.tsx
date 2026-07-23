@@ -28,7 +28,11 @@ import {
   Search,
   Filter,
   ArrowRight,
-  Download
+  Download,
+  Eye,
+  EyeOff,
+  Copy,
+  Key
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -104,6 +108,14 @@ export default function AdminPanel({
     remarks: ""
   });
   const [userError, setUserError] = useState("");
+  const [showPasswordMap, setShowPasswordMap] = useState<Record<string, boolean>>({});
+  const [credentialNotice, setCredentialNotice] = useState<{
+    fullName: string;
+    username: string;
+    password: string;
+    employeeId: string;
+    roleName: string;
+  } | null>(null);
 
   // Task Scheduler Form State
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
@@ -262,8 +274,18 @@ export default function AdminPanel({
       return;
     }
 
+    if (!editingId && !userForm.password) {
+      setUserError("Password is required when registering a new employee credential.");
+      return;
+    }
+
     if (!editingId && userForm.password !== userForm.rePassword) {
       setUserError("Passwords do not match.");
+      return;
+    }
+
+    if (userForm.password && userForm.password.length < 4) {
+      setUserError("Password must be at least 4 characters.");
       return;
     }
 
@@ -284,21 +306,34 @@ export default function AdminPanel({
     } else {
       // Check if username already exists
       if (users.some(u => u.username.toLowerCase() === userForm.username.toLowerCase())) {
-        setUserError("Username already exists.");
+        setUserError("Username already exists. Please choose a unique username.");
         return;
       }
-      setUsers(prev => [...prev, {
+
+      const assignedPassword = userForm.password || "password";
+      const newUser: User = {
         id: `user-${Date.now()}`,
         fullName: userForm.fullName,
         employeeId: userForm.employeeId,
         email: userForm.email,
         mobile: userForm.mobile,
         username: userForm.username,
-        password: userForm.password || "password",
+        password: assignedPassword,
         departmentId: userForm.departmentId,
         roleId: userForm.roleId,
         remarks: userForm.remarks
-      }]);
+      };
+
+      setUsers(prev => [...prev, newUser]);
+
+      const rName = roles.find(r => r.id === userForm.roleId)?.name || "Employee";
+      setCredentialNotice({
+        fullName: userForm.fullName,
+        username: userForm.username,
+        password: assignedPassword,
+        employeeId: userForm.employeeId,
+        roleName: rName
+      });
     }
 
     setUserForm({
@@ -1045,249 +1080,323 @@ export default function AdminPanel({
 
         {/* TAB 2: USERS MASTER */}
         {activeTab === "users" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 text-xs">
-            {/* Create / Edit Form */}
-            <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 h-fit space-y-4">
-              <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-1.5">
-                <Users className="h-4 w-4 text-amber-500" />
-                {editingId ? "Modify Existing User Account" : "Register New Team User"}
-              </h3>
-              <p className="text-slate-400 text-xs leading-relaxed">
-                Define security credentials, allocate to a corporate department, and assign system roles.
-              </p>
-
-              <form onSubmit={handleSaveUser} className="space-y-3 pt-2">
-                {userError && (
-                  <div className="bg-rose-500/10 text-rose-400 p-2.5 rounded-lg border border-rose-500/20 flex items-center gap-1.5">
-                    <AlertCircle className="h-4 w-4" />
-                    <span>{userError}</span>
+          <div className="space-y-6 flex-1 text-xs">
+            {/* Credential Generated Success Notice */}
+            {credentialNotice && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-emerald-500/10 border border-emerald-500/30 p-4 rounded-2xl flex items-start justify-between gap-4"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="h-9 w-9 bg-emerald-500/20 text-emerald-400 rounded-xl flex items-center justify-center shrink-0">
+                    <CheckCircle className="h-5 w-5" />
                   </div>
-                )}
-
-                <div className="space-y-1.5">
-                  <label className="block text-slate-400 font-medium">Full Employee Name <span className="text-amber-500">*</span></label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Alice Developer"
-                    value={userForm.fullName}
-                    onChange={e => setUserForm(prev => ({ ...prev, fullName: e.target.value }))}
-                    className="w-full bg-slate-900 border border-slate-800 text-slate-200 px-3 py-1.5 rounded-xl focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="block text-slate-400 font-medium">Employee ID <span className="text-amber-500">*</span></label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. EMP-104"
-                      value={userForm.employeeId}
-                      onChange={e => setUserForm(prev => ({ ...prev, employeeId: e.target.value }))}
-                      className="w-full bg-slate-900 border border-slate-800 text-slate-200 px-3 py-1.5 rounded-xl focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-slate-400 font-medium">Username <span className="text-amber-500">*</span></label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. alice_dev"
-                      value={userForm.username}
-                      onChange={e => setUserForm(prev => ({ ...prev, username: e.target.value }))}
-                      className="w-full bg-slate-900 border border-slate-800 text-slate-200 px-3 py-1.5 rounded-xl focus:outline-none focus:border-amber-500"
-                    />
+                  <div>
+                    <h4 className="font-bold text-emerald-300 text-sm">New User Credential Created Successfully!</h4>
+                    <p className="text-slate-300 text-xs mt-0.5">
+                      Share these login details with <strong className="text-slate-100">{credentialNotice.fullName}</strong> ({credentialNotice.roleName}).
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-3 bg-slate-950/80 border border-emerald-500/20 px-3 py-2 rounded-xl font-mono text-xs">
+                      <div><span className="text-slate-500">Employee ID:</span> <span className="text-amber-400 font-bold">{credentialNotice.employeeId}</span></div>
+                      <div className="text-slate-700">|</div>
+                      <div><span className="text-slate-500">Username:</span> <span className="text-slate-100 font-bold">{credentialNotice.username}</span></div>
+                      <div className="text-slate-700">|</div>
+                      <div><span className="text-slate-500">Password:</span> <span className="text-emerald-400 font-bold">{credentialNotice.password}</span></div>
+                    </div>
                   </div>
                 </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="block text-slate-400 font-medium">Email Address <span className="text-amber-500">*</span></label>
-                    <input
-                      type="email"
-                      required
-                      placeholder="alice@company.com"
-                      value={userForm.email}
-                      onChange={e => setUserForm(prev => ({ ...prev, email: e.target.value }))}
-                      className="w-full bg-slate-900 border border-slate-800 text-slate-200 px-3 py-1.5 rounded-xl focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-slate-400 font-medium">Mobile Contact</label>
-                    <input
-                      type="text"
-                      placeholder="+1 (555) 000-0000"
-                      value={userForm.mobile}
-                      onChange={e => setUserForm(prev => ({ ...prev, mobile: e.target.value }))}
-                      className="w-full bg-slate-900 border border-slate-800 text-slate-200 px-3 py-1.5 rounded-xl focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 bg-slate-900/50 p-3 rounded-xl border border-slate-800/80">
-                  <div className="space-y-1.5 col-span-2">
-                    <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Access Authorization</span>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-slate-400 font-medium">Department <span className="text-amber-500">*</span></label>
-                    <select
-                      required
-                      value={userForm.departmentId}
-                      onChange={e => setUserForm(prev => ({ ...prev, departmentId: e.target.value }))}
-                      className="w-full bg-slate-950 border border-slate-800 text-slate-200 px-2 py-1.5 rounded-xl focus:outline-none focus:border-amber-500"
-                    >
-                      <option value="">-- Choose --</option>
-                      {departments.map(d => (
-                        <option key={d.id} value={d.id}>{d.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-slate-400 font-medium">Corporate Role <span className="text-amber-500">*</span></label>
-                    <select
-                      required
-                      value={userForm.roleId}
-                      onChange={e => setUserForm(prev => ({ ...prev, roleId: e.target.value }))}
-                      className="w-full bg-slate-950 border border-slate-800 text-slate-200 px-2 py-1.5 rounded-xl focus:outline-none focus:border-amber-500"
-                    >
-                      <option value="">-- Choose --</option>
-                      {roles.map(r => (
-                        <option key={r.id} value={r.id}>{r.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="block text-slate-400 font-medium">
-                      {editingId ? "Update Password (Optional)" : "Set Password"} <span className="text-amber-500">*</span>
-                    </label>
-                    <input
-                      type="password"
-                      placeholder="******"
-                      value={userForm.password}
-                      onChange={e => setUserForm(prev => ({ ...prev, password: e.target.value }))}
-                      className="w-full bg-slate-900 border border-slate-800 text-slate-200 px-3 py-1.5 rounded-xl focus:outline-none focus:border-amber-500 font-mono"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-slate-400 font-medium">Re-enter Password</label>
-                    <input
-                      type="password"
-                      placeholder="******"
-                      value={userForm.rePassword}
-                      onChange={e => setUserForm(prev => ({ ...prev, rePassword: e.target.value }))}
-                      className="w-full bg-slate-900 border border-slate-800 text-slate-200 px-3 py-1.5 rounded-xl focus:outline-none focus:border-amber-500 font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block text-slate-400 font-medium">Administrator Remarks</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Relocated to Core Web Portal project"
-                    value={userForm.remarks}
-                    onChange={e => setUserForm(prev => ({ ...prev, remarks: e.target.value }))}
-                    className="w-full bg-slate-900 border border-slate-800 text-slate-200 px-3 py-1.5 rounded-xl focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2 pt-3">
-                  {editingId && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingId(null);
-                        setUserForm({
-                          fullName: "", employeeId: "", email: "", mobile: "",
-                          username: "", password: "", rePassword: "", departmentId: "", roleId: "", remarks: ""
-                        });
-                      }}
-                      className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium py-2 rounded-xl transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  )}
+                <div className="flex items-center gap-2">
                   <button
-                    type="submit"
-                    className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2 rounded-xl transition-all"
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(`Username: ${credentialNotice.username}\nPassword: ${credentialNotice.password}`);
+                      alert("Credentials copied to clipboard!");
+                    }}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-slate-950 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
                   >
-                    {editingId ? "Update Employee" : "Register Employee"}
+                    <Copy className="h-3.5 w-3.5" />
+                    Copy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCredentialNotice(null)}
+                    className="text-slate-400 hover:text-slate-200 p-1.5 rounded-lg"
+                  >
+                    <X className="h-4 w-4" />
                   </button>
                 </div>
-              </form>
-            </div>
+              </motion.div>
+            )}
 
-            {/* List Grid */}
-            <div className="lg:col-span-2 space-y-4">
-              <h3 className="font-semibold text-slate-200 text-sm flex items-center gap-1.5">
-                <Users className="h-4 w-4 text-slate-400" />
-                Active Employee Registrations
-              </h3>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Create / Edit Form */}
+              <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 h-fit space-y-4">
+                <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-1.5">
+                  <Users className="h-4 w-4 text-amber-500" />
+                  {editingId ? "Modify Existing User Account" : "Register New Team User"}
+                </h3>
+                <p className="text-slate-400 text-xs leading-relaxed">
+                  Define security credentials, allocate to a corporate department, and assign system roles.
+                </p>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {users.map(u => (
-                  <div key={u.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 hover:border-slate-700 transition-all flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-start justify-between">
+                <form onSubmit={handleSaveUser} className="space-y-3 pt-2">
+                  {userError && (
+                    <div className="bg-rose-500/10 text-rose-400 p-2.5 rounded-lg border border-rose-500/20 flex items-center gap-1.5">
+                      <AlertCircle className="h-4 w-4" />
+                      <span>{userError}</span>
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5">
+                    <label className="block text-slate-400 font-medium">Full Employee Name <span className="text-amber-500">*</span></label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Alice Developer"
+                      value={userForm.fullName}
+                      onChange={e => setUserForm(prev => ({ ...prev, fullName: e.target.value }))}
+                      className="w-full bg-slate-900 border border-slate-800 text-slate-200 px-3 py-1.5 rounded-xl focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="block text-slate-400 font-medium">Employee ID <span className="text-amber-500">*</span></label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. EMP-104"
+                        value={userForm.employeeId}
+                        onChange={e => setUserForm(prev => ({ ...prev, employeeId: e.target.value }))}
+                        className="w-full bg-slate-900 border border-slate-800 text-slate-200 px-3 py-1.5 rounded-xl focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="block text-slate-400 font-medium">Username <span className="text-amber-500">*</span></label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. alice_dev"
+                        value={userForm.username}
+                        onChange={e => setUserForm(prev => ({ ...prev, username: e.target.value }))}
+                        className="w-full bg-slate-900 border border-slate-800 text-slate-200 px-3 py-1.5 rounded-xl focus:outline-none focus:border-amber-500 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="block text-slate-400 font-medium">Email Address <span className="text-amber-500">*</span></label>
+                      <input
+                        type="email"
+                        required
+                        placeholder="alice@company.com"
+                        value={userForm.email}
+                        onChange={e => setUserForm(prev => ({ ...prev, email: e.target.value }))}
+                        className="w-full bg-slate-900 border border-slate-800 text-slate-200 px-3 py-1.5 rounded-xl focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="block text-slate-400 font-medium">Mobile Contact</label>
+                      <input
+                        type="text"
+                        placeholder="+1 (555) 000-0000"
+                        value={userForm.mobile}
+                        onChange={e => setUserForm(prev => ({ ...prev, mobile: e.target.value }))}
+                        className="w-full bg-slate-900 border border-slate-800 text-slate-200 px-3 py-1.5 rounded-xl focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 bg-slate-900/50 p-3 rounded-xl border border-slate-800/80">
+                    <div className="space-y-1.5 col-span-2">
+                      <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Access Authorization</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="block text-slate-400 font-medium">Department <span className="text-amber-500">*</span></label>
+                      <select
+                        required
+                        value={userForm.departmentId}
+                        onChange={e => setUserForm(prev => ({ ...prev, departmentId: e.target.value }))}
+                        className="w-full bg-slate-950 border border-slate-800 text-slate-200 px-2 py-1.5 rounded-xl focus:outline-none focus:border-amber-500"
+                      >
+                        <option value="">-- Choose --</option>
+                        {departments.map(d => (
+                          <option key={d.id} value={d.id}>{d.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="block text-slate-400 font-medium">Corporate Role <span className="text-amber-500">*</span></label>
+                      <select
+                        required
+                        value={userForm.roleId}
+                        onChange={e => setUserForm(prev => ({ ...prev, roleId: e.target.value }))}
+                        className="w-full bg-slate-950 border border-slate-800 text-slate-200 px-2 py-1.5 rounded-xl focus:outline-none focus:border-amber-500"
+                      >
+                        <option value="">-- Choose --</option>
+                        {roles.map(r => (
+                          <option key={r.id} value={r.id}>{r.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="block text-slate-400 font-medium">
+                        {editingId ? "Update Password (Optional)" : "Set Password"} <span className="text-amber-500">*</span>
+                      </label>
+                      <input
+                        type="password"
+                        placeholder="******"
+                        value={userForm.password}
+                        onChange={e => setUserForm(prev => ({ ...prev, password: e.target.value }))}
+                        className="w-full bg-slate-900 border border-slate-800 text-slate-200 px-3 py-1.5 rounded-xl focus:outline-none focus:border-amber-500 font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="block text-slate-400 font-medium">Re-enter Password</label>
+                      <input
+                        type="password"
+                        placeholder="******"
+                        value={userForm.rePassword}
+                        onChange={e => setUserForm(prev => ({ ...prev, rePassword: e.target.value }))}
+                        className="w-full bg-slate-900 border border-slate-800 text-slate-200 px-3 py-1.5 rounded-xl focus:outline-none focus:border-amber-500 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-slate-400 font-medium">Administrator Remarks</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Relocated to Core Web Portal project"
+                      value={userForm.remarks}
+                      onChange={e => setUserForm(prev => ({ ...prev, remarks: e.target.value }))}
+                      className="w-full bg-slate-900 border border-slate-800 text-slate-200 px-3 py-1.5 rounded-xl focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-3">
+                    {editingId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingId(null);
+                          setUserForm({
+                            fullName: "", employeeId: "", email: "", mobile: "",
+                            username: "", password: "", rePassword: "", departmentId: "", roleId: "", remarks: ""
+                          });
+                        }}
+                        className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium py-2 rounded-xl transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                    <button
+                      type="submit"
+                      className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2 rounded-xl transition-all cursor-pointer"
+                    >
+                      {editingId ? "Update Employee" : "Register Employee"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* List Grid */}
+              <div className="lg:col-span-2 space-y-4">
+                <h3 className="font-semibold text-slate-200 text-sm flex items-center gap-1.5">
+                  <Users className="h-4 w-4 text-slate-400" />
+                  Active Employee Registrations ({users.length})
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {users.map(u => {
+                    const isPwdRevealed = !!showPasswordMap[u.id];
+                    return (
+                      <div key={u.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 hover:border-slate-700 transition-all flex flex-col justify-between">
                         <div>
-                          <h4 className="font-semibold text-slate-200">{u.fullName}</h4>
-                          <span className="font-mono text-[10px] text-amber-500 mt-0.5 inline-block bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-                            {u.employeeId}
-                          </span>
-                        </div>
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() => handleEditUser(u)}
-                            className="p-1 text-slate-400 hover:text-amber-500 hover:bg-amber-500/10 rounded-lg transition-all"
-                          >
-                            <Edit className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteUser(u.id)}
-                            className="p-1 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </div>
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <h4 className="font-semibold text-slate-200">{u.fullName}</h4>
+                              <span className="font-mono text-[10px] text-amber-500 mt-0.5 inline-block bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                                {u.employeeId}
+                              </span>
+                            </div>
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => handleEditUser(u)}
+                                className="p-1 text-slate-400 hover:text-amber-500 hover:bg-amber-500/10 rounded-lg transition-all"
+                                title="Edit user profile"
+                              >
+                                <Edit className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteUser(u.id)}
+                                className="p-1 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all"
+                                title="Delete user profile"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </div>
 
-                      <div className="mt-4 space-y-1.5 border-t border-slate-900 pt-3">
-                        <div className="flex justify-between">
-                          <span className="text-slate-500">Department:</span>
-                          <span className="text-slate-300 font-medium">{getDepartmentName(u.departmentId)}</span>
+                          <div className="mt-4 space-y-1.5 border-t border-slate-900 pt-3">
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Department:</span>
+                              <span className="text-slate-300 font-medium">{getDepartmentName(u.departmentId)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Security Role:</span>
+                              <span className="text-slate-300 font-medium">{getRoleName(u.roleId)}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500">Username:</span>
+                              <span className="text-amber-400 font-mono font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">{u.username}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500 flex items-center gap-1">
+                                <Key className="h-3 w-3 text-slate-500" />
+                                Password:
+                              </span>
+                              <div className="flex items-center gap-1.5 font-mono">
+                                <span className="text-slate-200">
+                                  {isPwdRevealed ? (u.password || "password") : "••••••••"}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowPasswordMap(prev => ({ ...prev, [u.id]: !prev[u.id] }))}
+                                  className="text-slate-500 hover:text-slate-300 transition-colors p-0.5"
+                                  title={isPwdRevealed ? "Hide Password" : "Reveal Password"}
+                                >
+                                  {isPwdRevealed ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                                </button>
+                              </div>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Contact Email:</span>
+                              <span className="text-slate-300 font-mono truncate max-w-[150px]" title={u.email}>{u.email}</span>
+                            </div>
+                            {u.mobile && (
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">Mobile:</span>
+                                <span className="text-slate-300">{u.mobile}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-500">Security Role:</span>
-                          <span className="text-slate-300 font-medium">{getRoleName(u.roleId)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-500">Username:</span>
-                          <span className="text-slate-400 font-mono">{u.username}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-500">Contact Email:</span>
-                          <span className="text-slate-300 font-mono truncate max-w-[150px]" title={u.email}>{u.email}</span>
-                        </div>
-                        {u.mobile && (
-                          <div className="flex justify-between">
-                            <span className="text-slate-500">Mobile:</span>
-                            <span className="text-slate-300">{u.mobile}</span>
+
+                        {u.remarks && (
+                          <div className="mt-3 pt-2 border-t border-slate-900 text-[11px] text-slate-400 italic">
+                            Remarks: {u.remarks}
                           </div>
                         )}
                       </div>
-                    </div>
-
-                    {u.remarks && (
-                      <div className="mt-3 pt-2 border-t border-slate-900 text-[11px] text-slate-400 italic">
-                        Remarks: {u.remarks}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>

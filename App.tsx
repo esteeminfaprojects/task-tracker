@@ -1,8 +1,6 @@
-import React, { useState, useEffect, useRef } from "react";
-import { isRemoteEnabled } from "./supabaseClient";
-import { loadAllRemote, saveRemote } from "./remoteStore";
-import {
-  DEFAULT_ROLES,
+import React, { useState, useEffect } from "react";
+import { 
+  DEFAULT_ROLES, 
   DEFAULT_DEPARTMENTS, 
   DEFAULT_PROJECTS, 
   DEFAULT_USERS, 
@@ -14,6 +12,8 @@ import AdminPanel from "./AdminPanel";
 import HodPanel from "./HodPanel";
 import UserPanel from "./UserPanel";
 import AiAnalytics from "./AiAnalytics";
+import LoginScreen from "./LoginScreen";
+import CompanyLogo from "./CompanyLogo";
 import { 
   Shield, 
   Building2, 
@@ -31,6 +31,11 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 
 export default function App() {
+  // Authentication State
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return localStorage.getItem("tracker_auth_session") === "true";
+  });
+
   // Load State from LocalStorage or Fallback to SeedData
   const [roles, setRoles] = useState<Role[]>(() => {
     const saved = localStorage.getItem("tracker_roles");
@@ -48,99 +53,72 @@ export default function App() {
   });
 
   const [users, setUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem("tracker_users");
-    return saved ? JSON.parse(saved) : DEFAULT_USERS;
+    const saved = localStorage.getItem("tracker_users_v2");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.some(u => u.username === "subrata@dril.net.in")) {
+          return parsed;
+        }
+      } catch (e) {
+        console.error("Failed to parse saved users", e);
+      }
+    }
+    return DEFAULT_USERS;
   });
 
   const [tasks, setTasks] = useState<Task[]>(() => {
-    const saved = localStorage.getItem("tracker_tasks");
+    const saved = localStorage.getItem("tracker_tasks_v2");
     return saved ? JSON.parse(saved) : DEFAULT_TASKS;
   });
 
   const [timeLogs, setTimeLogs] = useState<TimeLog[]>(() => {
-    const saved = localStorage.getItem("tracker_timeLogs");
+    const saved = localStorage.getItem("tracker_timeLogs_v2");
     return saved ? JSON.parse(saved) : DEFAULT_TIMELOGS;
   });
 
   // Active logged-in user persona
   const [activeUserId, setActiveUserId] = useState<string>(() => {
     const saved = localStorage.getItem("tracker_active_user");
-    return saved || DEFAULT_USERS[0].id; // Defaults to Admin Subrata
+    return saved || "user-subrata";
   });
 
   // Active Top-Level View Tab
   const [activeTab, setActiveTab] = useState<"admin" | "hod" | "user" | "ai">("user");
   const [showUserDropdown, setShowUserDropdown] = useState(false);
 
-  // Becomes true once we've loaded shared data from Supabase (or confirmed it's
-  // disabled). We must NOT push local defaults to the cloud before hydration,
-  // otherwise the first browser to open would overwrite everyone else's data.
-  const hydratedRef = useRef(false);
-
-  // One-time hydration from Supabase = the shared, multi-user source of truth.
-  // For any collection missing in the cloud, we seed it from current state.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      if (!isRemoteEnabled) {
-        hydratedRef.current = true;
-        return;
-      }
-      try {
-        const remote = await loadAllRemote();
-        if (cancelled) return;
-        remote.roles ? setRoles(remote.roles as Role[]) : saveRemote("roles", roles);
-        remote.departments ? setDepartments(remote.departments as Department[]) : saveRemote("departments", departments);
-        remote.projects ? setProjects(remote.projects as Project[]) : saveRemote("projects", projects);
-        remote.users ? setUsers(remote.users as User[]) : saveRemote("users", users);
-        remote.tasks ? setTasks(remote.tasks as Task[]) : saveRemote("tasks", tasks);
-        remote.timeLogs ? setTimeLogs(remote.timeLogs as TimeLog[]) : saveRemote("timeLogs", timeLogs);
-      } catch (err) {
-        console.error("[App] remote hydration failed, using local data:", err);
-      } finally {
-        hydratedRef.current = true;
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Sync back to local storage (offline cache) AND Supabase (shared) on changes.
+  // Sync back to local storage on changes
   useEffect(() => {
     localStorage.setItem("tracker_roles", JSON.stringify(roles));
-    if (hydratedRef.current) saveRemote("roles", roles);
   }, [roles]);
 
   useEffect(() => {
     localStorage.setItem("tracker_departments", JSON.stringify(departments));
-    if (hydratedRef.current) saveRemote("departments", departments);
   }, [departments]);
 
   useEffect(() => {
     localStorage.setItem("tracker_projects", JSON.stringify(projects));
-    if (hydratedRef.current) saveRemote("projects", projects);
   }, [projects]);
 
   useEffect(() => {
-    localStorage.setItem("tracker_users", JSON.stringify(users));
-    if (hydratedRef.current) saveRemote("users", users);
+    localStorage.setItem("tracker_users_v2", JSON.stringify(users));
   }, [users]);
 
   useEffect(() => {
-    localStorage.setItem("tracker_tasks", JSON.stringify(tasks));
-    if (hydratedRef.current) saveRemote("tasks", tasks);
+    localStorage.setItem("tracker_tasks_v2", JSON.stringify(tasks));
   }, [tasks]);
 
   useEffect(() => {
-    localStorage.setItem("tracker_timeLogs", JSON.stringify(timeLogs));
-    if (hydratedRef.current) saveRemote("timeLogs", timeLogs);
+    localStorage.setItem("tracker_timeLogs_v2", JSON.stringify(timeLogs));
   }, [timeLogs]);
 
   useEffect(() => {
     localStorage.setItem("tracker_active_user", activeUserId);
   }, [activeUserId]);
+
+  useEffect(() => {
+    localStorage.setItem("tracker_auth_session", isAuthenticated ? "true" : "false");
+  }, [isAuthenticated]);
 
   // Resolve current user info
   const activeUser = users.find(u => u.id === activeUserId) || users[0] || DEFAULT_USERS[0];
@@ -160,6 +138,13 @@ export default function App() {
     }
   }, [activeUserId, activeRole]);
 
+  // Handle Logout
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    localStorage.removeItem("tracker_auth_session");
+    setShowUserDropdown(false);
+  };
+
   // Quick reset factory defaults helper
   const handleResetToFactory = () => {
     if (window.confirm("This will erase all active edits and restore original corporate master files. Continue?")) {
@@ -172,24 +157,31 @@ export default function App() {
       setTimeLogs(DEFAULT_TIMELOGS);
       setActiveUserId(DEFAULT_USERS[0].id);
       setActiveTab("admin");
+      setIsAuthenticated(true);
     }
   };
+
+  // If user is not logged in, render Login Screen
+  if (!isAuthenticated) {
+    return (
+      <LoginScreen
+        users={users}
+        roles={roles}
+        departments={departments}
+        onLogin={(userId) => {
+          setActiveUserId(userId);
+          setIsAuthenticated(true);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col">
       {/* PERSUASIVE TOP BAR / CORPORATE HEADER */}
-      <header className="bg-slate-900/60 border-b border-slate-800/80 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
+      <header className="bg-slate-900/60 border-b border-slate-800/80 backdrop-blur-md sticky top-0 z-40 px-6 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 bg-gradient-to-tr from-amber-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/10">
-            <Layers className="h-5 w-5 text-slate-950 font-bold" />
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-bold tracking-tight text-slate-100 text-sm">Enterprise Task tracker</span>
-              <span className="bg-amber-500/10 text-amber-400 font-mono text-[9px] font-bold px-1.5 py-0.5 rounded border border-amber-500/20">v2.4</span>
-            </div>
-            <span className="text-[10px] text-slate-400 font-mono block">Integrated Masters & Time Capture Suite</span>
-          </div>
+          <CompanyLogo variant="header" theme="dark" />
         </div>
 
         {/* INTERACTIVE ROLE PERSPECTIVE SWITCHER */}
@@ -255,15 +247,22 @@ export default function App() {
                       })}
                     </div>
 
-                    <div className="p-1">
+                    <div className="p-1 space-y-1">
+                      <button
+                        onClick={handleLogout}
+                        className="w-full text-left p-2.5 rounded-xl hover:bg-rose-500/10 text-rose-400 hover:text-rose-300 transition-colors flex items-center gap-2 font-semibold"
+                      >
+                        <LogOut className="h-3.5 w-3.5" />
+                        Log Out Active Session
+                      </button>
                       <button
                         onClick={() => {
                           handleResetToFactory();
                           setShowUserDropdown(false);
                         }}
-                        className="w-full text-left p-2.5 rounded-xl hover:bg-rose-500/10 text-rose-400 hover:text-rose-300 transition-colors flex items-center gap-2 font-medium"
+                        className="w-full text-left p-2.5 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-slate-300 transition-colors flex items-center gap-2 font-medium"
                       >
-                        <RefreshCw className="h-3.5 w-3.5" />
+                        <RefreshCw className="h-3.5 w-3.5 text-slate-500" />
                         Reset Factory Defaults
                       </button>
                     </div>
@@ -272,6 +271,15 @@ export default function App() {
               )}
             </AnimatePresence>
           </div>
+
+          <button
+            onClick={handleLogout}
+            className="bg-slate-900 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 border border-slate-800 hover:border-rose-500/30 px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all text-xs font-semibold cursor-pointer"
+            title="Log Out of system"
+          >
+            <LogOut className="h-3.5 w-3.5 text-slate-400 group-hover:text-rose-300" />
+            <span className="hidden sm:inline">Log Out</span>
+          </button>
         </div>
       </header>
 
@@ -404,7 +412,11 @@ export default function App() {
       {/* BOTTOM FOOTER */}
       <footer className="bg-slate-950 py-6 border-t border-slate-900 mt-auto text-center text-[11px] text-slate-500">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-3">
-          <span>Enterprise Task Management and Time Tracker © 2026. All corporate systems operational.</span>
+          <div className="flex flex-col sm:flex-row items-center gap-2">
+            <CompanyLogo variant="footer" theme="dark" />
+            <span className="hidden sm:inline text-slate-700">|</span>
+            <span>Time & Task Management System © 2026</span>
+          </div>
           <div className="flex gap-4">
             <span>Server Ingress Inbound Port: 3000</span>
             <span>Platform Services Secured</span>
