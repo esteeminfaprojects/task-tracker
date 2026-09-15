@@ -60,9 +60,42 @@ export default function HodPanel({
   const deptUserIds = deptUsers.map(u => u.id);
 
   // Filter tasks assigned to department employees OR supervised by HOD
-  const deptTasks = tasks.filter(t => 
+  const deptTasks = tasks.filter(t =>
     deptUserIds.includes(t.assignedUserId) || t.responsibleUserId === activeUser.id
   );
+
+  // ---- Deadline alerts (department-scoped) ----
+  // A task is flagged when it has a due date, is not yet completed, and is due
+  // within the next 7 days OR already past due.
+  const ALERT_WINDOW_DAYS = 7;
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const daysUntilDue = (due?: string | null): number | null => {
+    if (!due) return null;
+    const d = new Date(due);
+    if (isNaN(d.getTime())) return null;
+    d.setHours(0, 0, 0, 0);
+    return Math.round((d.getTime() - startOfToday.getTime()) / 86400000);
+  };
+  const deadlineAlerts = deptTasks
+    .filter(t => t.status !== "Completed")
+    .map(t => ({ task: t, days: daysUntilDue(t.dueDate) }))
+    .filter(x => x.days !== null && (x.days as number) <= ALERT_WINDOW_DAYS)
+    .sort((a, b) => (a.days as number) - (b.days as number));
+  const overdueCount = deadlineAlerts.filter(x => (x.days as number) < 0).length;
+  const dueSoonCount = deadlineAlerts.length - overdueCount;
+  const fmtDue = (due?: string | null) => {
+    if (!due) return "—";
+    const d = new Date(due);
+    return isNaN(d.getTime()) ? "—" : d.toLocaleDateString();
+  };
+  const dueLabel = (days: number | null) => {
+    if (days === null) return "";
+    if (days < 0) return `${Math.abs(days)}d overdue`;
+    if (days === 0) return "Due today";
+    if (days === 1) return "Due tomorrow";
+    return `Due in ${days}d`;
+  };
 
   // Local Scheduling Modal (only for department)
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -71,6 +104,7 @@ export default function HodPanel({
     projectId: "",
     parentTaskId: "",
     estimatedHours: 8,
+    dueDate: "",
     assignedUserId: "",
     description: ""
   });
@@ -188,6 +222,7 @@ export default function HodPanel({
         projectId: taskForm.projectId,
         parentTaskId: taskForm.parentTaskId ? taskForm.parentTaskId : null,
         estimatedHours: Number(taskForm.estimatedHours) || 1,
+        dueDate: taskForm.dueDate || null,
         todoList: todoList,
         assignedUserId: taskForm.assignedUserId,
         description: taskForm.description,
@@ -200,6 +235,7 @@ export default function HodPanel({
         projectId: taskForm.projectId,
         parentTaskId: taskForm.parentTaskId ? taskForm.parentTaskId : null,
         estimatedHours: Number(taskForm.estimatedHours) || 1,
+        dueDate: taskForm.dueDate || null,
         todoList: todoList,
         assignedUserId: taskForm.assignedUserId,
         responsibleUserId: activeUser.id, // HOD is the supervisor
@@ -222,6 +258,7 @@ export default function HodPanel({
       projectId: "",
       parentTaskId: "",
       estimatedHours: 8,
+      dueDate: "",
       assignedUserId: "",
       description: ""
     });
@@ -235,6 +272,7 @@ export default function HodPanel({
       projectId: task.projectId,
       parentTaskId: task.parentTaskId || "",
       estimatedHours: task.estimatedHours,
+      dueDate: task.dueDate ? task.dueDate.slice(0, 10) : "",
       assignedUserId: task.assignedUserId,
       description: task.description || ""
     });
@@ -325,6 +363,47 @@ export default function HodPanel({
           </div>
         </div>
       </div>
+
+      {deadlineAlerts.length > 0 && (
+        <div className="bg-gradient-to-r from-rose-500/10 to-amber-500/10 border border-rose-500/30 rounded-2xl p-5">
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="h-9 w-9 rounded-xl bg-rose-500/20 flex items-center justify-center shrink-0">
+                <AlertCircle className="h-5 w-5 text-rose-400" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-100 text-sm">Deadline Alerts — {hodDept?.name || "Your Department"}</h3>
+                <p className="text-[11px] text-slate-400">
+                  {overdueCount > 0 && <span className="text-rose-400 font-semibold">{overdueCount} overdue</span>}
+                  {overdueCount > 0 && dueSoonCount > 0 && <span> · </span>}
+                  {dueSoonCount > 0 && <span className="text-amber-400 font-semibold">{dueSoonCount} due within {ALERT_WINDOW_DAYS} days</span>}
+                </p>
+              </div>
+            </div>
+            <span className="text-[10px] uppercase tracking-wider text-slate-500 font-mono">Department-specific</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {deadlineAlerts.slice(0, 6).map(({ task, days }) => (
+              <div key={task.id} className={`flex items-center justify-between gap-3 p-2.5 rounded-lg border ${ (days as number) < 0 ? "bg-rose-500/10 border-rose-500/20" : "bg-amber-500/5 border-amber-500/15"}`}>
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold text-slate-200 truncate">{task.name}</div>
+                  <div className="text-[10px] text-slate-500 truncate flex items-center gap-1">
+                    <Users className="h-3 w-3" /> {getEmployeeName(task.assignedUserId)}
+                    <span className="text-slate-700">•</span>
+                    <Calendar className="h-3 w-3" /> {fmtDue(task.dueDate)}
+                  </div>
+                </div>
+                <span className={`shrink-0 text-[10px] font-bold px-2 py-1 rounded-md ${ (days as number) < 0 ? "bg-rose-500/20 text-rose-300" : "bg-amber-500/20 text-amber-300"}`}>
+                  {dueLabel(days)}
+                </span>
+              </div>
+            ))}
+          </div>
+          {deadlineAlerts.length > 6 && (
+            <p className="text-[10px] text-slate-500 mt-2">+ {deadlineAlerts.length - 6} more task(s) approaching deadline — see the task list below.</p>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-xs">
         {/* HOD STATS SUMMARY */}
@@ -479,6 +558,7 @@ export default function HodPanel({
               <th className="px-4 py-3">Project</th>
               <th className="px-4 py-3">Assigned Team Member</th>
               <th className="px-4 py-3 text-center">Estimated</th>
+              <th className="px-4 py-3 text-center">Due Date</th>
               <th className="px-4 py-3">Workflow Status</th>
               <th className="px-4 py-3">Progress</th>
               {hodRole?.permissions.tasks && <th className="px-4 py-3 text-center">Actions</th>}
@@ -487,7 +567,7 @@ export default function HodPanel({
           <tbody className="divide-y divide-slate-800/60 text-slate-300">
             {deptTasks.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center py-12 text-slate-500 font-medium">
+                <td colSpan={7} className="text-center py-12 text-slate-500 font-medium">
                   No active tasks allocated in this department.
                 </td>
               </tr>
@@ -507,6 +587,20 @@ export default function HodPanel({
                   <td className="px-4 py-3.5 text-slate-400">{getProjectName(task.projectId)}</td>
                   <td className="px-4 py-3.5 font-medium text-slate-300">{getEmployeeName(task.assignedUserId)}</td>
                   <td className="px-4 py-3.5 text-center font-mono text-slate-400">{task.estimatedHours} hrs</td>
+                  <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                    {task.dueDate ? (
+                      <div className="flex flex-col items-center">
+                        <span className="font-mono text-slate-300 text-[11px]">{fmtDue(task.dueDate)}</span>
+                        {task.status !== "Completed" && daysUntilDue(task.dueDate) !== null && (daysUntilDue(task.dueDate) as number) <= ALERT_WINDOW_DAYS && (
+                          <span className={`text-[9px] font-bold ${ (daysUntilDue(task.dueDate) as number) < 0 ? "text-rose-400" : "text-amber-400"}`}>
+                            {dueLabel(daysUntilDue(task.dueDate))}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-slate-600">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3.5">
                     <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
                       task.status === "Completed" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" :
@@ -562,6 +656,7 @@ export default function HodPanel({
                     projectId: "",
                     parentTaskId: "",
                     estimatedHours: 8,
+                    dueDate: "",
                     assignedUserId: "",
                     description: ""
                   });
@@ -676,6 +771,18 @@ export default function HodPanel({
                 </div>
               </div>
 
+              {/* Due date / deadline */}
+              <div className="space-y-1.5">
+                <label className="block text-slate-400 font-medium">Due Date (Deadline)</label>
+                <input
+                  type="date"
+                  value={taskForm.dueDate}
+                  onChange={e => setTaskForm(prev => ({ ...prev, dueDate: e.target.value }))}
+                  className="w-full bg-slate-950 border border-slate-800 text-slate-200 px-3 py-2 rounded-xl focus:outline-none focus:border-indigo-500 font-mono"
+                />
+                <p className="text-[10px] text-slate-500">Tasks due within {ALERT_WINDOW_DAYS} days (or overdue) appear in this department's deadline alerts.</p>
+              </div>
+
               {/* Todo checklist input */}
               <div className="space-y-2 pt-2 border-t border-slate-800/60">
                 <label className="block text-slate-400 font-medium">Task Checklist</label>
@@ -759,6 +866,7 @@ export default function HodPanel({
                       projectId: "",
                       parentTaskId: "",
                       estimatedHours: 8,
+                      dueDate: "",
                       assignedUserId: "",
                       description: ""
                     });

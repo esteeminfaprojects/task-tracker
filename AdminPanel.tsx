@@ -124,6 +124,7 @@ export default function AdminPanel({
     projectId: "",
     parentTaskId: "",
     estimatedHours: 8,
+    dueDate: "",
     assignedUserId: "",
     responsibleUserId: "",
     description: "",
@@ -406,6 +407,7 @@ export default function AdminPanel({
         projectId: taskForm.projectId,
         parentTaskId: taskForm.parentTaskId ? taskForm.parentTaskId : null,
         estimatedHours: Number(taskForm.estimatedHours) || 1,
+        dueDate: taskForm.dueDate || null,
         todoList: todoList,
         assignedUserId: taskForm.assignedUserId,
         responsibleUserId: taskForm.responsibleUserId,
@@ -421,6 +423,7 @@ export default function AdminPanel({
         projectId: taskForm.projectId,
         parentTaskId: taskForm.parentTaskId ? taskForm.parentTaskId : null,
         estimatedHours: Number(taskForm.estimatedHours) || 1,
+        dueDate: taskForm.dueDate || null,
         todoList: todoList,
         assignedUserId: taskForm.assignedUserId,
         responsibleUserId: taskForm.responsibleUserId,
@@ -442,6 +445,7 @@ export default function AdminPanel({
       projectId: "",
       parentTaskId: "",
       estimatedHours: 8,
+      dueDate: "",
       assignedUserId: "",
       responsibleUserId: "",
       description: "",
@@ -459,6 +463,7 @@ export default function AdminPanel({
       projectId: task.projectId,
       parentTaskId: task.parentTaskId || "",
       estimatedHours: task.estimatedHours,
+      dueDate: task.dueDate ? task.dueDate.slice(0, 10) : "",
       assignedUserId: task.assignedUserId,
       responsibleUserId: task.responsibleUserId,
       description: task.description,
@@ -852,6 +857,7 @@ export default function AdminPanel({
                           projectId: "",
                           parentTaskId: "",
                           estimatedHours: 8,
+                          dueDate: "",
                           assignedUserId: "",
                           responsibleUserId: "",
                           description: "",
@@ -930,6 +936,18 @@ export default function AdminPanel({
                           onChange={e => setTaskForm(prev => ({ ...prev, estimatedHours: Number(e.target.value) }))}
                           className="w-full bg-slate-950 border border-slate-800 text-slate-200 px-3 py-2 rounded-xl focus:outline-none focus:border-amber-500 text-xs font-mono"
                         />
+                      </div>
+
+                      {/* Due date / deadline */}
+                      <div className="space-y-1.5">
+                        <label className="block text-slate-400 font-medium">Due Date (Deadline)</label>
+                        <input
+                          type="date"
+                          value={taskForm.dueDate}
+                          onChange={e => setTaskForm(prev => ({ ...prev, dueDate: e.target.value }))}
+                          className="w-full bg-slate-950 border border-slate-800 text-slate-200 px-3 py-2 rounded-xl focus:outline-none focus:border-amber-500 text-xs font-mono"
+                        />
+                        <p className="text-[10px] text-slate-500">Drives deadline alerts on the relevant department HOD dashboard.</p>
                       </div>
 
                       {/* File upload attachment */}
@@ -1052,6 +1070,7 @@ export default function AdminPanel({
                             projectId: "",
                             parentTaskId: "",
                             estimatedHours: 8,
+                            dueDate: "",
                             assignedUserId: "",
                             responsibleUserId: "",
                             description: "",

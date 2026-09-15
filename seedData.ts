@@ -137,6 +137,7 @@ export const DEFAULT_TASKS: Task[] = [
     status: "In Progress",
     percentage: 55,
     createdDate: getDateOffset(-5),
+    dueDate: getDateOffset(3).slice(0, 10),
     completedDate: null,
   },
   {
@@ -158,6 +159,7 @@ export const DEFAULT_TASKS: Task[] = [
     status: "Completed",
     percentage: 100,
     createdDate: getDateOffset(-7),
+    dueDate: getDateOffset(-2).slice(0, 10),
     completedDate: getDateOffset(-3),
   },
   {
@@ -178,6 +180,7 @@ export const DEFAULT_TASKS: Task[] = [
     status: "Completed",
     percentage: 100,
     createdDate: getDateOffset(-3),
+    dueDate: getDateOffset(1).slice(0, 10),
     completedDate: getDateOffset(-1),
   },
   {
@@ -198,6 +201,7 @@ export const DEFAULT_TASKS: Task[] = [
     status: "Pending",
     percentage: 0,
     createdDate: getDateOffset(-1),
+    dueDate: getDateOffset(5).slice(0, 10),
     completedDate: null,
   }
 ];

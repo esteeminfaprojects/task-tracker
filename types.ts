@@ -61,6 +61,7 @@ export interface Task {
   status: 'Pending' | 'In Progress' | 'Completed';
   percentage: number; // 0 to 100
   createdDate: string; // ISO date-time
+  dueDate?: string | null; // YYYY-MM-DD deadline (optional; drives HOD deadline alerts)
   completedDate: string | null; // ISO date-time
 }
 
